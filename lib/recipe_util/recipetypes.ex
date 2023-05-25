@@ -1,4 +1,5 @@
 defmodule RecipeType do
+
   defstruct [
     :header_len,
     :recipe_name,
@@ -27,7 +28,8 @@ defmodule RecipeType do
       :stencil_size,
       :stencil_naplps,
       :original_size,
-      :original_naplps
+      :original_naplps,
+      :is_footer
     ]
   end
 
@@ -71,7 +73,6 @@ defmodule RecipeType do
 
   end
 
-  # defp parse_lists(list_count, data), do: parse_one_list(list_count, [], data)
   defp parse_lists(list_count, data), do: parse_one_list(list_count, [], data)
 
   defp parse_one_list(0, lists, _data), do: lists
@@ -107,8 +108,15 @@ defmodule RecipeType do
       0x0b02::16-big,
       original_size::16-little,
       original_naplps::binary-size(original_size),
-      rest::binary
+      rest_footer::binary
     >> = data
+
+    {is_footer, rest} = case {rest_footer} do
+      {<<0x08020000::32-big, rest::binary>>} ->
+        {true, rest}
+      _ ->
+        {false, rest_footer}
+    end
 
     a_list = %ListType{
       list_size: list_size,
@@ -125,7 +133,8 @@ defmodule RecipeType do
       stencil_size: stencil_size,
       stencil_naplps: stencil_naplps,
       original_size: original_size,
-      original_naplps: original_naplps
+      original_naplps: original_naplps,
+      is_footer: is_footer
     }
     parse_one_list(list_count - 1, lists ++ [a_list], rest)
   end
