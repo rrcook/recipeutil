@@ -146,11 +146,20 @@ defmodule RecipeType do
     generated_names = Enum.reduce(recipe_struct.list_names, <<>>, fn x, acc -> acc <> x <> << 0 >> end)
     generated_lists = generate_recipe_lists(recipe_struct)
 
+    generated_header_len =
+      # size of all the constants
+      4 + 4 + 4 + 4 + 4 + 2 +
+      # size of all the constant sized variables
+      21 + 31 + 27 + 3 + 2 + 2 +
+      #variable length bytes
+      String.length(generated_names)
+
     recipe_list = [
       "GCULIST",
       <<0x00::8>>,
       <<0x50020001::32-big>>,
-      <<recipe_struct.header_len::16-little>>,
+      <<generated_header_len::16-little>>,
+
       <<0x01011500::32-big>>,
       <<recipe_struct.recipe_name::binary-size(21)>>,
       <<0x02011F00::32-big>>,
@@ -162,7 +171,7 @@ defmodule RecipeType do
       <<0x05010200::32-big>>,
       <<recipe_struct.list_count::16-little>>,
       <<0x0601::16-big>>,
-      <<recipe_struct.list_names_len::16-little>>,
+      <<String.length(generated_names)::16-little>>,
       generated_names,
       generated_lists
     ]
@@ -182,9 +191,21 @@ defmodule RecipeType do
       _ -> <<>>
     end
 
+    generated_list_size =
+      # size of all the constants
+      4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 2 + 2 +
+      # size of all the constant sized variables
+      11 + 4 + 2 + 2 + 2 + 8 + 4 + 4 + 29 + 29 + 2 + 2 +
+      # variable length bytes
+      byte_size(rl_struct.stencil_naplps) + byte_size(rl_struct.original_naplps) +
+      byte_size(gen_footer)
+
+    IO.puts("struct size is #{rl_struct.list_size}, gen size is #{generated_list_size}")
+
     rl_list = [
       <<0x0002::16-big>>,
       <<rl_struct.list_size::16-little>>,
+
       <<0x01020b00::32-big>>,
       <<rl_struct.list_name::binary-size(11)>>,
       <<0x02020400::32-big>>,
@@ -204,11 +225,11 @@ defmodule RecipeType do
       <<0x0a021d00::32-big>>,
       <<rl_struct.ask_phil5::binary-size(29)>>,
       <<0x0702::16-big>>,
-      <<rl_struct.stencil_size::16-little>>,
-      <<rl_struct.stencil_naplps::binary-size(rl_struct.stencil_size)>>,
+      <<byte_size(rl_struct.stencil_naplps)::16-little>>,
+      <<rl_struct.stencil_naplps::binary>>,
       <<0x0b02::16-big>>,
-      <<rl_struct.original_size::16-little>>,
-      <<rl_struct.original_naplps::binary-size(rl_struct.original_size)>>,
+      <<byte_size(rl_struct.original_naplps)::16-little>>,
+      <<rl_struct.original_naplps::binary>>,
       gen_footer
     ]
 
