@@ -29,7 +29,7 @@ defmodule RecipeType do
       :stencil_naplps,
       :original_size,
       :original_naplps,
-      :is_footer
+      :has_footer
     ]
   end
 
@@ -111,7 +111,7 @@ defmodule RecipeType do
       rest_footer::binary
     >> = data
 
-    {is_footer, rest} = case {rest_footer} do
+    {has_footer, rest} = case {rest_footer} do
       {<<0x08020000::32-big, rest::binary>>} ->
         {true, rest}
       _ ->
@@ -134,11 +134,84 @@ defmodule RecipeType do
       stencil_naplps: stencil_naplps,
       original_size: original_size,
       original_naplps: original_naplps,
-      is_footer: is_footer
+      has_footer: has_footer
     }
     parse_one_list(list_count - 1, lists ++ [a_list], rest)
   end
 
-  def generate(_recipe_struct) do
+  defp gen_from_list(a_list), do: Enum.reduce(a_list, <<>>, fn x, acc -> acc <> x end)
+
+  def generate(%RecipeType{} = recipe_struct) do
+
+    generated_names = Enum.reduce(recipe_struct.list_names, <<>>, fn x, acc -> acc <> x <> << 0 >> end)
+    generated_lists = generate_recipe_lists(recipe_struct)
+
+    recipe_list = [
+      "GCULIST",
+      <<0x00::8>>,
+      <<0x50020001::32-big>>,
+      <<recipe_struct.header_len::16-little>>,
+      <<0x01011500::32-big>>,
+      <<recipe_struct.recipe_name::binary-size(21)>>,
+      <<0x02011F00::32-big>>,
+      <<recipe_struct.recipe_descr::binary-size(31)>>,
+      <<0x03011B00::32-big>>,
+      <<recipe_struct.object_id::binary-size(27)>>,
+      <<0x04010300::32-big>>,
+      <<recipe_struct.partition_num::binary-size(3)>>,
+      <<0x05010200::32-big>>,
+      <<recipe_struct.list_count::16-little>>,
+      <<0x0601::16-big>>,
+      <<recipe_struct.list_names_len::16-little>>,
+      generated_names,
+      generated_lists
+    ]
+
+    gen_from_list(recipe_list)
+  end
+
+  defp generate_recipe_lists(%RecipeType{} = recipe_struct) do
+    gen_recipe_lists = Enum.map(recipe_struct.list_list, &generate_one_recipe_list/1)
+    gen_from_list(gen_recipe_lists)
+  end
+
+  defp generate_one_recipe_list(%RecipeType.ListType{} = rl_struct) do
+
+    gen_footer = case rl_struct.has_footer do
+      true -> <<0x08020000::32-big>>
+      _ -> <<>>
+    end
+
+    rl_list = [
+      <<0x0002::16-big>>,
+      <<rl_struct.list_size::16-little>>,
+      <<0x01020b00::32-big>>,
+      <<rl_struct.list_name::binary-size(11)>>,
+      <<0x02020400::32-big>>,
+      <<rl_struct.field_no::binary-size(4)>>,
+      <<0x03020600::32-big>>,
+      <<rl_struct.type::16-little>>,
+      <<rl_struct.display::16-little>>,
+      <<rl_struct.edit::16-little>>,
+      <<0x04020800::32-big>>,
+      <<rl_struct.ask_phil1::binary-size(8)>>,
+      <<0x05020400::32-big>>,
+      <<rl_struct.ask_phil2::binary-size(4)>>,
+      <<0x06020400::32-big>>,
+      <<rl_struct.ask_phil3::binary-size(4)>>,
+      <<0x09021d00::32-big>>,
+      <<rl_struct.ask_phil4::binary-size(29)>>,
+      <<0x0a021d00::32-big>>,
+      <<rl_struct.ask_phil5::binary-size(29)>>,
+      <<0x0702::16-big>>,
+      <<rl_struct.stencil_size::16-little>>,
+      <<rl_struct.stencil_naplps::binary-size(rl_struct.stencil_size)>>,
+      <<0x0b02::16-big>>,
+      <<rl_struct.original_size::16-little>>,
+      <<rl_struct.original_naplps::binary-size(rl_struct.original_size)>>,
+      gen_footer
+    ]
+
+    gen_from_list(rl_list)
   end
 end
