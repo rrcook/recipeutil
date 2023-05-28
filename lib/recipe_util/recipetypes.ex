@@ -36,8 +36,6 @@ defmodule RecipeType do
   def parse(data) do
     <<"GCULIST", 0x00, 0x50020001::32-big, header_len::16-little, rest1::binary>> = data
 
-    IO.puts("header len is #{header_len}")
-
     <<
       0x01011500::32-big,
       recipe_name::binary-size(21),
@@ -55,7 +53,6 @@ defmodule RecipeType do
       rest2::binary
     >> = rest1
 
-    IO.puts("Made it here.")
     list_list = parse_lists(list_count, rest2)
 
     {:ok,
@@ -80,7 +77,6 @@ defmodule RecipeType do
   defp parse_one_list(list_count, lists, data) do
     alias RecipeType.ListType
 
-    IO.puts("List Count is #{list_count}")
     <<
       0x0002::16-big,
       list_size::16-little,
@@ -200,11 +196,10 @@ defmodule RecipeType do
       byte_size(rl_struct.stencil_naplps) + byte_size(rl_struct.original_naplps) +
       byte_size(gen_footer)
 
-    IO.puts("struct size is #{rl_struct.list_size}, gen size is #{generated_list_size}")
 
     rl_list = [
       <<0x0002::16-big>>,
-      <<rl_struct.list_size::16-little>>,
+      <<generated_list_size::16-little>>,
 
       <<0x01020b00::32-big>>,
       <<rl_struct.list_name::binary-size(11)>>,
