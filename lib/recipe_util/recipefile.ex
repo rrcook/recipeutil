@@ -1,19 +1,26 @@
 defmodule RecipeUtil.File do
+
+  @subst_map  %{
+    "Body" =>
+    "This is line 1" <> << 0x0D, 0x0A >> <>
+    "This is line 2" <> << 0x0D, 0x0A >> <>
+    "This is a longer line 3",
+    "HL" =>
+    "Richard is a l33t haX0r",
+    "NextHL" =>
+    "NEWSFLASH! Elixir Is Fun!"
+  }
+
   def run(%{} = args \\ %{}) do
     source = Map.get(args, :source)
     dest = Map.get(args, :dest)
 
-    with {:ok, file} <- File.open(source),
-    data <- IO.binread(file, :eof),
-     :ok <- File.close(file) do
-      {:ok, recipe, _rest} = RecipeType.parse(data)
+    with {:ok, data} <- File.read(source) do
+      {:ok, recipe, _rest} = RecipeType.parse(data, @subst_map)
       # IO.inspect(recipe_type)
       recipe_bytes = RecipeType.generate(recipe)
       if (dest) do
-        with {:ok, file} <- File.open(dest, [:write, :binary]) do
-          IO.binwrite(file, recipe_bytes)
-          File.close(file)
-        end
+        File.write!(dest, recipe_bytes)
       else
         IO.inspect(recipe)
       end
