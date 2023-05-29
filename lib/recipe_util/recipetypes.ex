@@ -33,7 +33,9 @@ defmodule RecipeType do
     ]
   end
 
-  def parse(data) do
+  defp string_from_list_name(list_name), do: String.split(list_name, << 0 >>) |> Enum.at(0)
+
+  def parse(data, %{} = subst_map \\ %{}) do
     <<"GCULIST", 0x00, 0x50020001::32-big, header_len::16-little, rest1::binary>> = data
 
     <<
@@ -53,7 +55,7 @@ defmodule RecipeType do
       rest2::binary
     >> = rest1
 
-    list_list = parse_lists(list_count, rest2)
+    list_list = parse_lists(list_count, rest2, subst_map)
 
     {:ok,
      %RecipeType {
@@ -70,11 +72,23 @@ defmodule RecipeType do
 
   end
 
-  defp parse_lists(list_count, data), do: parse_one_list(list_count, [], data)
+  defp parse_lists(list_count, data, %{} = subst_map), do: parse_one_list(list_count, [], data, subst_map)
 
-  defp parse_one_list(0, lists, _data), do: lists
+  defp make_stencil(stencil_naplps_p, value) do
+    <<
+    header::binary-size(8),
+    _body::binary
+    >> = stencil_naplps_p
+    <<
+    header::binary-size(8),
+    value::binary,
+    0xF2A5::16-big
+    >>
+  end
 
-  defp parse_one_list(list_count, lists, data) do
+  defp parse_one_list(0, lists, _data, %{} = _subst_map), do: lists
+
+  defp parse_one_list(list_count, lists, data, %{} = subst_map) do
     alias RecipeType.ListType
 
     <<
@@ -100,12 +114,20 @@ defmodule RecipeType do
       ask_phil5::binary-size(29),
       0x0702::16-big,
       stencil_size::16-little,
-      stencil_naplps::binary-size(stencil_size),
+      stencil_naplps_p::binary-size(stencil_size),
       0x0b02::16-big,
       original_size::16-little,
-      original_naplps::binary-size(original_size),
+      _original_naplps_p::binary-size(original_size),
       rest_footer::binary
     >> = data
+
+    string_name = string_from_list_name(list_name)
+    IO.puts("the name is '#{string_name}'")
+
+    stencil_naplps = case Map.get(subst_map, string_name, nil) do
+      nil -> stencil_naplps_p
+      value -> make_stencil(stencil_naplps_p, value)
+    end
 
     {has_footer, rest} = case {rest_footer} do
       {<<0x08020000::32-big, rest::binary>>} ->
@@ -129,11 +151,16 @@ defmodule RecipeType do
       stencil_size: stencil_size,
       stencil_naplps: stencil_naplps,
       original_size: original_size,
-      original_naplps: original_naplps,
+      original_naplps: stencil_naplps,
       has_footer: has_footer
     }
-    parse_one_list(list_count - 1, lists ++ [a_list], rest)
+
+    #File.write(Integer.to_string(list_count) <> ".s", stencil_naplps)
+    #File.write(Integer.to_string(list_count) <> ".o", original_naplps)
+
+    parse_one_list(list_count - 1, lists ++ [a_list], rest, subst_map)
   end
+
 
   defp gen_from_list(a_list), do: Enum.reduce(a_list, <<>>, fn x, acc -> acc <> x end)
 
@@ -148,7 +175,7 @@ defmodule RecipeType do
       # size of all the constant sized variables
       21 + 31 + 27 + 3 + 2 + 2 +
       #variable length bytes
-      String.length(generated_names)
+      byte_size(generated_names)
 
     recipe_list = [
       "GCULIST",
@@ -167,7 +194,7 @@ defmodule RecipeType do
       <<0x05010200::32-big>>,
       <<recipe_struct.list_count::16-little>>,
       <<0x0601::16-big>>,
-      <<String.length(generated_names)::16-little>>,
+      <<byte_size(generated_names)::16-little>>,
       generated_names,
       generated_lists
     ]
