@@ -75,14 +75,16 @@ defmodule RecipeType do
   defp parse_lists(list_count, data, %{} = subst_map), do: parse_one_list(list_count, [], data, subst_map)
 
   defp make_stencil(stencil_naplps_p, value) do
+    middle_byte_size = byte_size(stencil_naplps_p) - (8 + 1)
     <<
-    header::binary-size(8),
-    _body::binary
+      beginning_bytes::binary-size(8),
+      _middle_bytes::binary-size(middle_byte_size),
+      end_bytes::binary-size(1)
     >> = stencil_naplps_p
     <<
-    header::binary-size(8),
-    value::binary,
-    0xF2A5::16-big
+      beginning_bytes::binary-size(8),
+      value::binary,
+      end_bytes::binary-size(1)
     >>
   end
 
