@@ -26,12 +26,14 @@ defmodule RecipeUtil.CLI do
         aliases: [
           d: :dest,
           s: :source,
-          h: :help
+          h: :help,
+          p: :page_setup
         ],
         strict: [
           help: :boolean,
           dest: :string,
-          source: :string
+          source: :string,
+          page_setup: :boolean
         ]
       )
 
